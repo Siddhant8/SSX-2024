@@ -336,10 +336,10 @@ rho0['g'] = totaldist
 
 # rdist = np.tanh(40*r+40)*(zdist-rho_min)/2 + np.tanh(40*(1-r))*(zdist-rho_min)/2 + rho_min old tanh disk distribution
 
-#rho['g'] = rho0['g']
+rho['g'] = rho0['g']
 #lnrho['g'] = np.log(rho0['g'])
 
-T['g'] = T0 * rho0['g']**(gamma - 1)
+T['g'] = T0 * rho_min**(gamma - 1)
 ##eta['g'] = eta_sp/(np.sqrt(T['g'])**3 + (eta_ch/np.sqrt(rho0))*(1 - np.exp((-v0_ch)/(3*rho0*np.sqrt(gamma*T['g']))))
 
 # Frame for meta params in D3 with RealFourier
