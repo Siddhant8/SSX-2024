@@ -118,12 +118,12 @@ zbasis = d3.RealFourier(coords['z'], size=nz, bounds=(0, length), dealias = deal
 t = dist.Field(name='t')
 v = dist.VectorField(coords, name='v', bases=(xbasis, ybasis, zbasis))
 A = dist.VectorField(coords, name='A', bases=(xbasis, ybasis, zbasis))
-#rho = dist.Field(name='rho', bases=(xbasis, ybasis, zbasis))
+rho = dist.Field(name='rho', bases=(xbasis, ybasis, zbasis))
 
 T = dist.Field(name='T', bases=(xbasis, ybasis, zbasis))
 phi = dist.Field(name='phi', bases=(xbasis, ybasis, zbasis))
 tau_A = dist.Field(name='tau_A')
-tau_p = dist.Field(name='tau_p')
+tau_v = dist.Field(name='tau_v')
 # eta = dist.Field(name='T', bases=(xbasis, ybasis, zbasis))
 ex, ey, ez = coords.unit_vector_fields(dist)
 
@@ -147,14 +147,14 @@ Cs_vec = Cs*ex + Cs*ey + Cs*ez
 
 
 #Problem
-SSX = d3.IVP([v, A, T, phi, tau_A, tau_p], time=t, namespace=locals())
+SSX = d3.IVP([v, A, T, phi, rho, tau_A, tau_v], time=t, namespace=locals())
 
 #variable resistivity
 # SSX.add_equation("eta = eta_sp/(np.sqrt(T)**3) + (eta_ch/np.sqrt(rho))*(1 - np.exp((-v0_ch*np.sqrt(J2))/(3*rho*np.sqrt(gamma*T))))")
 
 # Not really good model but this would be how you'd express incompressibility
 
-SSX.add_equation("div(v) + tau_p = 0")
+SSX.add_equation("div(v) + tau_v = 0")
 
 # Continuity
 #SSX.add_equation("dt(lnrho) = -div(v) - v@grad(lnrho)")
@@ -170,7 +170,7 @@ SSX.add_equation("div(A) + tau_A = 0")
 SSX.add_equation("integ(phi) = 0")
 
 # Energy
-SSX.add_equation("dt(T) - (gamma - 1) * chi*lap(T) = - (gamma - 1) * T * div(v) - v@grad(T) + (gamma - 1)*eta*J2")
+SSX.add_equation("dt(T) - (gamma - 1) * chi*lap(T) = - v@grad(T) + (gamma - 1)*eta*J2")
 
 solver = SSX.build_solver(d3.RK222) # (now 222, formerly 443; try both)
 
