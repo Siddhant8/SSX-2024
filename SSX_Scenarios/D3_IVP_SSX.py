@@ -147,14 +147,14 @@ Cs_vec = Cs*ex + Cs*ey + Cs*ez
 
 
 #Problem
-SSX = d3.IVP([v, A, T, phi, rho, tau_A, tau_v], time=t, namespace=locals())
+SSX = d3.IVP([v, A, T, phi, rho, tau_A], time=t, namespace=locals())
 
 #variable resistivity
 # SSX.add_equation("eta = eta_sp/(np.sqrt(T)**3) + (eta_ch/np.sqrt(rho))*(1 - np.exp((-v0_ch*np.sqrt(J2))/(3*rho*np.sqrt(gamma*T))))")
 
 # Not really good model but this would be how you'd express incompressibility
 
-SSX.add_equation("div(v) + tau_v = 0")
+SSX.add_equation("div(v) = 0")
 
 # Continuity
 #SSX.add_equation("dt(lnrho) = -div(v) - v@grad(lnrho)")
