@@ -123,7 +123,7 @@ A = dist.VectorField(coords, name='A', bases=(xbasis, ybasis, zbasis))
 T = dist.Field(name='T', bases=(xbasis, ybasis, zbasis))
 phi = dist.Field(name='phi', bases=(xbasis, ybasis, zbasis))
 tau_A = dist.Field(name='tau_A')
-#tau_p = dist.Field(name='tau_p')
+tau_p = dist.Field(name='tau_p')
 # eta = dist.Field(name='T', bases=(xbasis, ybasis, zbasis))
 ex, ey, ez = coords.unit_vector_fields(dist)
 
@@ -147,14 +147,14 @@ Cs_vec = Cs*ex + Cs*ey + Cs*ez
 
 
 #Problem
-SSX = d3.IVP([v, A, T, phi, tau_A], time=t, namespace=locals())
+SSX = d3.IVP([v, A, T, phi, tau_A, tau_p], time=t, namespace=locals())
 
 #variable resistivity
 # SSX.add_equation("eta = eta_sp/(np.sqrt(T)**3) + (eta_ch/np.sqrt(rho))*(1 - np.exp((-v0_ch*np.sqrt(J2))/(3*rho*np.sqrt(gamma*T))))")
 
 # Not really good model but this would be how you'd express incompressibility
 
-SSX.add_equation("div(v) = 0")
+SSX.add_equation("div(v) + tau_p = 0")
 
 # Continuity
 #SSX.add_equation("dt(lnrho) = -div(v) - v@grad(lnrho)")
