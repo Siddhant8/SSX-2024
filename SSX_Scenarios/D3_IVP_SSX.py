@@ -118,12 +118,12 @@ zbasis = d3.RealFourier(coords['z'], size=nz, bounds=(0, length), dealias = deal
 t = dist.Field(name='t')
 v = dist.VectorField(coords, name='v', bases=(xbasis, ybasis, zbasis))
 A = dist.VectorField(coords, name='A', bases=(xbasis, ybasis, zbasis))
-rho = dist.Field(name='rho', bases=(xbasis, ybasis, zbasis))
+#rho = dist.Field(name='rho', bases=(xbasis, ybasis, zbasis))
 
 T = dist.Field(name='T', bases=(xbasis, ybasis, zbasis))
 phi = dist.Field(name='phi', bases=(xbasis, ybasis, zbasis))
 tau_A = dist.Field(name='tau_A')
-tau_v = dist.Field(name='tau_v')
+#tau_v = dist.Field(name='tau_v')
 # eta = dist.Field(name='T', bases=(xbasis, ybasis, zbasis))
 ex, ey, ez = coords.unit_vector_fields(dist)
 
@@ -131,36 +131,37 @@ ex, ey, ez = coords.unit_vector_fields(dist)
 j = -d3.lap(A)
 J2 = j@j
 B = d3.curl(A)
-rho_min = 0.011
+
 #spitzer and chodra resistivity combination
 # eta = eta_sp/(np.sqrt(T)**3) + (eta_ch/np.sqrt(rho))*(1 - np.exp((-v0_ch*np.sqrt(J2))/(3*rho*np.sqrt(gamma*T))))
 
 #lnrho = np.log(rho)
 #lnrho_dt = d3.TimeDerivative(lnrho)
 
-#lnrho = dist.Field(name = 'lnrho', bases=(xbasis, ybasis, zbasis))
+lnrho = dist.Field(name = 'lnrho', bases=(xbasis, ybasis, zbasis))
 
 # CFL substitutions
-Va = B/np.sqrt(rho_min) # mu_0 = 1 in our sim
+Va = B/np.sqrt(np.exp(lnrho)) # mu_0 = 1 in our sim
 Cs = np.sqrt(gamma*T)
 Cs_vec = Cs*ex + Cs*ey + Cs*ez
 
 
 #Problem
-SSX = d3.IVP([v, A, T, phi, rho, tau_A], time=t, namespace=locals())
+SSX = d3.IVP([v, A, lnrho, T, phi, tau_A], time=t, namespace=locals())
 
 #variable resistivity
 # SSX.add_equation("eta = eta_sp/(np.sqrt(T)**3) + (eta_ch/np.sqrt(rho))*(1 - np.exp((-v0_ch*np.sqrt(J2))/(3*rho*np.sqrt(gamma*T))))")
 
 # Not really good model but this would be how you'd express incompressibility
 
-SSX.add_equation("div(v) = 0")
+
+SSX.add_equation("dt(lnrho) + div(v) = -v@grad(lnrho)")
 
 # Continuity
 #SSX.add_equation("dt(lnrho) = -div(v) - v@grad(lnrho)")
 
 # Momentum
-SSX.add_equation("dt(v) + grad(T) - nu*lap(v) = - v@grad(v) + cross(j,B)/(rho_min)")
+SSX.add_equation("dt(v) + grad(T) - nu*lap(v) = T*grad(lnrho) - v@grad(v) + cross(j,B)/(np.exp(lnrho))")
 
 # MHD equations: A
 SSX.add_equation("dt(A) + grad(phi) + eta*j = cross(v,B)")
@@ -170,7 +171,7 @@ SSX.add_equation("div(A) + tau_A = 0")
 SSX.add_equation("integ(phi) = 0")
 
 # Energy
-SSX.add_equation("dt(T) - (gamma - 1) * chi*lap(T) = - v@grad(T) + (gamma - 1)*eta*J2")
+SSX.add_equation("dt(T) - (gamma - 1) * chi*lap(T) = - (gamma - 1) * T * div(v) - v@grad(T) + (gamma - 1)*eta*J2")
 
 solver = SSX.build_solver(d3.RK222) # (now 222, formerly 443; try both)
 
@@ -336,10 +337,10 @@ rho0['g'] = totaldist
 
 # rdist = np.tanh(40*r+40)*(zdist-rho_min)/2 + np.tanh(40*(1-r))*(zdist-rho_min)/2 + rho_min old tanh disk distribution
 
-rho['g'] = rho0['g']
-#lnrho['g'] = np.log(rho0['g'])
+#rho['g'] = rho0['g']
+lnrho['g'] = np.log(rho0['g'])
 
-T['g'] = T0 * rho_min**(gamma - 1)
+T['g'] = T0 * rho0['g']**(gamma - 1)
 ##eta['g'] = eta_sp/(np.sqrt(T['g'])**3 + (eta_ch/np.sqrt(rho0))*(1 - np.exp((-v0_ch)/(3*rho0*np.sqrt(gamma*T['g']))))
 
 # Frame for meta params in D3 with RealFourier
@@ -389,11 +390,11 @@ flow.add_property(np.sqrt(v@v) / nu, name = 'Re_k')
 flow.add_property(np.sqrt(v@v) / eta, name = 'Re_m')
 flow.add_property(np.sqrt(v@v), name = 'flow_speed')
 flow.add_property(np.sqrt(v@v) / np.sqrt(T), name = 'Ma') # Mach number; T going negative? T goes negative because rho goes negative
-#flow.add_property(np.sqrt(B@B) / rho_min, name = 'Al_v')
-flow.add_property(np.sqrt(B@B / np.sqrt(rho_min)), name = 'Al_v') # see if this makes it more positively well-behaved
+flow.add_property(np.sqrt(B@B) / np.sqrt(np.exp(lnrho)), name = 'Al_v')
+flow.add_property(np.sqrt(B@B / np.exp(lnrho)), name = 'Al_v') # see if this makes it more positively well-behaved
 flow.add_property(T, name = 'temp')
-#flow.add_property(np.exp(lnrho), name = 'density')
-#flow.add_property(lnrho, name = 'log_density')
+flow.add_property(np.exp(lnrho), name = 'density')
+flow.add_property(lnrho, name = 'log_density')
 flow.add_property(0.5*d3.integ(v@v), name='Ekin')
 flow.add_property(0.5*d3.integ(B@B),name='E_mag')
 flow.add_property(0.5*0.1*(np.sqrt(T)**2)/(0.5*(B@B)), name = 'beta')
@@ -441,9 +442,9 @@ try:
             # version with Re_k and Re_m
             logger_string += ' Max Re_k = {:.2g}, Avg Re_k = {:.2g}, Max Re_m = {:.2g}, \
 Avg Re_m = {:.2g}, Max vel = {:.2g}, Avg vel = {:.2g}, Max alf vel = {:.2g}, Avg alf vel = {:.2g}, \
-Max Ma = {:.1g}, max T = {:.2g}, \
+Max Ma = {:.1g}, max rho = {:.2g}, min rho = {:.2g}, max log = {:.2g}, min log = {:.2g}, max T = {:.2g}, \
 min T = {:.2g}, min Al_v = {:.2g}, Emag = {:.2g}, Ekin = {:.2g}, B = {:.2g}, beta = {:.2g} '.format(flow.max('Re_k'), Re_k_avg, flow.max('Re_m'), Re_m_avg,\
-flow.max('flow_speed'), v_avg, flow.max('Al_v'), Al_v_avg, flow.max('Ma'), flow.max('temp'), \
+flow.max('flow_speed'), v_avg, flow.max('Al_v'), Al_v_avg, flow.max('Ma'), flow.max('density'), flow.min('density'), flow.max('log_density'), flow.min('log_density'), flow.max('temp'), \
 flow.min('temp'),flow.min('Al_v'),flow.grid_average('E_mag'), flow.grid_average('Ekin'), flow.max('B'), flow.grid_average('beta'))
 #can't do dot product of non-coordinate fields
 #can't take grid average of temperature - go into why I can't do this
