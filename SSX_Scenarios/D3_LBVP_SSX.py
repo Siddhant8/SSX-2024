@@ -109,6 +109,72 @@ def spheromak_pair(xbasis,ybasis,zbasis, coords, dist, center=(0,0,0), B0 = 1, R
     
     return A
 
+def spheromak_pair_new(xbasis, ybasis, zbasis, coords, dist):
+    '''this is a new version of the spheromack_pair function that only plots the A-field of two spheromacks, one on either end of the tube'''
+    
+    B0 = 1
+    R = 1
+    L = 1
+    
+    j1_zero1 = jn_zeros(1,1)[0]
+    kr = j1_zero1/R
+    kz = np.pi/L
+    lam = np.sqrt(kr**2 + kz**2)
+    J0 = B0 # This should be 1.
+    #define handedness of Taylor states. Difference between LH and RH should just be sign on the theta component
+    hand1 = 1
+    hand2 = 1
+
+    J = dist.VectorField(coords, name='J', bases=(xbasis, ybasis, zbasis))
+    x, y, z = dist.local_grids(xbasis, ybasis, zbasis)
+
+    # Setting cylindrical coordinates
+    r = np.sqrt(x**2 + y**2)
+    theta = np.arctan2(y,x)
+
+    mod_z1 = (z - 1) * -10
+    tanh1 = np.tanh(mod_z1[0, 0, 0:16])
+    z_slice1 = z[0,0,0:16]
+    J_r1 = lam*(-kz*np.pi*j1(kr*r)*np.cos(kz*z_slice1)) * tanh1
+    J_t1 = hand1*lam*(lam*j1(kr*r)*np.sin(kz*z_slice1)) * tanh1
+    J_z1 = lam*(kr*j0(kr*r)*np.sin(kz*z_slice1)) * tanh1
+
+    mod_z2 = (z - 9) * 10
+    tanh2 = np.tanh(mod_z2[0, 0, 144:160])
+    z_slice2 = z[0,0,144:160]
+    J_r2 = lam*(-kz*np.pi*j1(kr*r)*np.cos(kz*(10-z_slice2))) * tanh2
+    J_t2 = -hand2*lam*(lam*j1(kr*r)*np.sin(kz*(10-z_slice2))) * tanh2
+    J_z2 = -lam*(kr*j0(kr*r)*np.sin(kz*(10-z_slice2))) * tanh2
+
+    J_r = np.zeros_like(J['g'][0])
+    J_r[:,:, 0:16] = J_r1
+    J_r[:,:, 144:] = J_r2
+
+    J_t = np.zeros_like(J['g'][0])
+    J_t[:,:, 0:16] = J_t1
+    J_t[:,:, 144:] = J_t2
+
+    J_z = np.zeros_like(J['g'][0])
+    J_z[:,:, 0:16] = J_z1
+    J_z[:,:, 144:] = J_z2
+
+    #Convert to Cartesian coordinates
+    J['g'][0] = J0*(J_r*np.cos(theta) - J_t*np.sin(theta))
+    J['g'][1] = J0*(J_r*np.sin(theta) + J_t*np.cos(theta))
+    J['g'][2] = J0*J_z
+
+    A = dist.VectorField(coords, name='A', bases=(xbasis, ybasis, zbasis))
+    tau_phi = dist.VectorField(coords, name='tau_phi')
+
+    problem = d3.LBVP([A, tau_phi],namespace=locals())
+
+    problem.add_equation("lap(A) + tau_phi =  -J") # + grad(phi) term for Div(A) case # + tau_phi
+    #problem.add_equation("integ(A) = 0")
+
+    solver = problem.build_solver()
+    solver.solve()
+
+    return A
 # Not currently used due to manually written out parity enforcement. This function can be ignored.
 def zero_modes(initfield, par, scalar=False):
 #enforce meta parity parameters on fields - 0 is even/cosine, 1 is odd/sine
