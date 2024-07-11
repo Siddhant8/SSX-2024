@@ -83,8 +83,8 @@ data_dir = "scratch" #change each time or overwrite
 
 kappa = 0.1
 # try both of these 0.1 see what happens
-mu = 0.05 #Determines Re_k ; 0.05 -> Re_k = 20 (try 0.005?)
-eta = 0.01 # Determines Re_m ; 0.001 -> Re_m = 1000; using smaller Rm of 100 for now since 1000 is a bit high.
+eta = 0.005 #Determines Re_k ; 0.05 -> Re_k = 20 (try 0.005?)
+nu = 0.001 # Determines Re_m ; 0.001 -> Re_m = 1000; using smaller Rm of 100 for now since 1000 is a bit high.
 
 gamma = 5./3.
 
@@ -95,7 +95,6 @@ B0 = 1
 # v0_ch = 2.9 * 10**(-2)
 
 chi = kappa
-nu = mu
 #diffusivities for heat (kappa -> chi), momentum (viscosity) (mu -> nu), current (eta)
 # life time of currents regulated by resistivity
 # linearization time of temperature goes like e^-t/kappa
@@ -123,6 +122,8 @@ A = dist.VectorField(coords, name='A', bases=(xbasis, ybasis, zbasis))
 T = dist.Field(name='T', bases=(xbasis, ybasis, zbasis))
 phi = dist.Field(name='phi', bases=(xbasis, ybasis, zbasis))
 tau_A = dist.Field(name='tau_A')
+lnrho = dist.Field(name = 'lnrho', bases=(xbasis, ybasis, zbasis))
+
 #tau_v = dist.Field(name='tau_v')
 # eta = dist.Field(name='T', bases=(xbasis, ybasis, zbasis))
 ex, ey, ez = coords.unit_vector_fields(dist)
@@ -137,8 +138,6 @@ B = d3.curl(A)
 
 #lnrho = np.log(rho)
 #lnrho_dt = d3.TimeDerivative(lnrho)
-
-lnrho = dist.Field(name = 'lnrho', bases=(xbasis, ybasis, zbasis))
 
 # CFL substitutions
 Va = B/np.sqrt(np.exp(lnrho)) # mu_0 = 1 in our sim
@@ -161,17 +160,17 @@ SSX.add_equation("dt(lnrho) + div(v) = -v@grad(lnrho)")
 #SSX.add_equation("dt(lnrho) = -div(v) - v@grad(lnrho)")
 
 # Momentum
-SSX.add_equation("dt(v) + grad(T) - nu*lap(v) = T*grad(lnrho) - v@grad(v) + cross(j,B)/(np.exp(lnrho))")
+SSX.add_equation("dt(v) + grad(T) - eta*lap(v) = T*grad(lnrho) - v@grad(v) + cross(j,B)/(np.exp(lnrho))")
 
 # MHD equations: A
-SSX.add_equation("dt(A) + grad(phi) + eta*j = cross(v,B)")
+SSX.add_equation("dt(A) + grad(phi) + nu*j = cross(v,B)")
 
 #gauge constraints
 SSX.add_equation("div(A) + tau_A = 0")
 SSX.add_equation("integ(phi) = 0")
 
 # Energy
-SSX.add_equation("dt(T) - (gamma - 1) * chi*lap(T) = - (gamma - 1) * T * div(v) - v@grad(T) + (gamma - 1)*eta*J2")
+SSX.add_equation("dt(T) - (gamma - 1) * chi*lap(T) = - (gamma - 1) * T * div(v) - v@grad(T) + (gamma - 1)*nu*J2")
 
 solver = SSX.build_solver(d3.RK222) # (now 222, formerly 443; try both)
 
@@ -181,7 +180,7 @@ logger.info("Solver built")
 dt = 1e-4
 
 # Integration parameters
-solver.stop_sim_time = 20 #historically 20
+solver.stop_sim_time = 0.01 #historically 20
 solver.stop_wall_time = np.inf #e.g. 60*60*3 would limit runtime to three hours
 solver.stop_iteration = np.inf
 
@@ -192,13 +191,13 @@ aa = dist.VectorField(coords, name='aa', bases=(xbasis, ybasis, zbasis))
 R = rad
 L = R
 rho_min = 0.011
-T0 = 0.1
+T0 = 1
 delta = 0.1 # The strength of the perturbation. Schaffner et al 2014 (flux-rope plasma) has delta = 0.1.
 r = np.sqrt(x**2+y**2)
 
 # Spheromak initial condition
 j1_zero1 = jn_zeros(1,1)[0]
-kr = j1_zero1/R
+kr = 3.83/R
 kz = np.pi/L
 
 #BEGINNING of In-line vector potential
@@ -234,7 +233,7 @@ kz = np.pi/L
 
 aa = spheromak_pair(xbasis,ybasis,zbasis, coords, dist)
 
-'''''
+
 handedness = 1
 b0 = 1
 lam = np.sqrt(kr**2 + kz**2)
@@ -265,7 +264,7 @@ aa['g'][1] = ((Ar+Ar2)*np.sin(theta) + (At+At2)*np.cos(theta)) * zVecDist2 * rVe
 aa['g'][2] = (Az+Az2) * zVecDist2 * rVecDist
 
 # The vector potential is subject to some perturbation. This distorts all the magnetic field components in the same direction.
-'''
+
 if A_perturb:
     for i in range(3):
         A['g'][i] = aa['g'][i] *(1 + delta*x*np.exp(-z**2) + delta*x*np.exp(-(z-10)**2)) # maybe the exponent here is too steep of an IC?
@@ -308,14 +307,22 @@ v['g'][2] = -np.tanh(z-2)*max_vel/2 + -np.tanh(z - 8)*max_vel/2
 
 #rdist and zdist are what is responsible for showing four plasmas
 #rdist = (-np.cos(np.pi*r/rad)*(1-rho_min)/2 + 1/2)*np.exp(-4*r)
-#zdist = -np.cos(wavz*4*np.pi*z/length)*(1-rho_min)/2 + 1/2
+#zdist = -np.cos(wavz*4*np.pi*(z-5)/length)*(1-rho_min)/2 + 1/2
 
-zdist = (-np.tanh(4*(z - 3)) + np.tanh(4*(z - 1)) - np.tanh(-4*(z - 7)) + np.tanh(-4*(z - 9)))/2
-rdist = -np.tanh(5*(r - 1))/2 + 0.5
+
+#zdist = -np.tanh(z-1) + np.tanh(z+1) + np.tanh(z-9) - np.tanh(z-11)
+rdist = (np.tanh(10*(r-(3/10))) + np.tanh(-10*(r - (9/10))))*(1-rho_min)/2 + rho_min
+
+#zdist = (np.tanh(2*(z-1.5)) - np.tanh(-2*(z-8.5)))*(1-rho_min)/2 + 1
+#rdist = (np.tanh(10*(r-(3/10))) + np.tanh(-10*(r - (9/10))))*(1-rho_min)/2 + rho_min
+
+zdist = (-np.tanh(4*(z - 1)) + np.tanh(4*(z + 1)) - np.tanh(-4*(z - 9)) + np.tanh(-4*(z - 11)))/2
+#rdist = -np.tanh(5*(r - 1))/2 + 0.5
 
 #zdist = (np.tanh(2*(z-1.5)) - np.tanh(-2*(x-8.5)))*(1-rho_min)/2 + 1
 #rdist = (np.tanh(10*(r-3/10)) + np.tanh(-10*(r-9/10))) * (1-rho_min)/2 + rho_min
 # other current option is to try the poloidal flux formulation as Doc suggested:
+
 #rdist = r *j1(kr *r)
 #zdist = np.sin(kz*z)
 #poloidal flux didn't work - ask Doc what is going wrong
@@ -324,7 +331,7 @@ rdist = -np.tanh(5*(r - 1))/2 + 0.5
 # rdist = -np.cos(2*np.pi*2*x/rad)*np.cos(2*np.pi*y/rad)*(1-rho_min)/2 + 1/2
 
 # Solve the NLBVP for initial density to get smooth ICs that agree with magnetics
-totaldist = rdist*zdist+rho_min # adding rho_min here to resolve the rho_min product concern with negative density
+totaldist = rdist*zdist + rho_min # adding rho_min here to resolve the rho_min product concern with negative density
 
 # constant density test
 #totaldist = 1
