@@ -73,13 +73,19 @@ def spheromak_pair(xbasis,ybasis,zbasis, coords, dist, center=(0,0,0), B0 = 1, R
 
     """ Initializing the J fields for the dedalus problem. """
     # J0 is set to B0, which should be 1.
+    #zVecDist2 = (-np.tanh(4*(z - 1)) + np.tanh(4*(z + 1)) - np.tanh(-4*(z - 9)) + np.tanh(-4*(z - 11)))/2
     
+    #rVecDist = -np.tanh(5*(r - 1))/2 + 0.5
+    #rVecDist = (np.tanh(10*(r-(3/10))) + np.tanh(-10*(r - (9/10))))*(1-0.011)/2 + 0.011
+
     #Convert to Cartesian coordinates
     J['g'][0] = J0*(J_r*np.cos(theta) - J_t*np.sin(theta))
     J['g'][1] = J0*(J_r*np.sin(theta) + J_t*np.cos(theta))
     J['g'][2] = J0*J_z
 
     A = dist.VectorField(coords, name='A', bases=(xbasis, ybasis, zbasis))
+    #B = dist.VectorField(coords, name='B', bases=(xbasis, ybasis, zbasis))
+    #B = dist.VectorField(coords, name='B', bases=(xbasis, ybasis, zbasis))
 
     #Meta/Parity specifiers
     # e.g. A_i is even in i-basis, odd in other two (see func further below)
@@ -90,16 +96,22 @@ def spheromak_pair(xbasis,ybasis,zbasis, coords, dist, center=(0,0,0), B0 = 1, R
 
     # phi field not necessary if integ(A) is correct gauge
     # phi = dist.Field(name='phi', bases=(xbasis,ybasis,zbasis))
+    tau_A = dist.Field(name='tau_A')
     tau_phi = dist.VectorField(coords, name='tau_phi')
-
-    problem = d3.LBVP([A, tau_phi],namespace=locals())
+    #tau_A = dist.VectorField(coords, name='tau_A')
+    #tau_A = dist.VectorField(coords, name='tau_A')
+    problem = d3.LBVP([A, tau_A],namespace=locals())
 
     # Force Free Equations/Spheromak """
 
     # lap(A) = -J
     # Need to come up with a good way to check if what this gives is correct.
-    problem.add_equation("lap(A) + tau_phi =  -J") # + grad(phi) term for Div(A) case # + tau_phi
-    problem.add_equation("integ(A) = 0")
+    #problem.add_equation("lap(A) =  -J") # + grad(phi) term for Div(A) case # + tau_phi
+    problem.add_equation("div(A) + tau_A = 0")
+    problem.add_equation("lap(A) = -J")
+    #problem.add_equation("curl(A) = B")
+    #problem.add_equation("integ(A) = 0")
+    #problem.add_equation("curl(A) = B/lam")
     # problem.add_equation("div(A) = 0") # haven't been able to implement coulomb gauge instead of integ gauge here yet.
     # Need to figure out why it isn't working, since it doesn't seem that integ(A) is an equivalent gauge.
 
@@ -108,6 +120,7 @@ def spheromak_pair(xbasis,ybasis,zbasis, coords, dist, center=(0,0,0), B0 = 1, R
     solver.solve()
     
     return A
+
 
 def spheromak_pair_new(xbasis, ybasis, zbasis, coords, dist):
     '''this is a new version of the spheromack_pair function that only plots the A-field of two spheromacks, one on either end of the tube'''
